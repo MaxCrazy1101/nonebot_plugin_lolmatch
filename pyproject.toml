@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "nonebot_plugin_lolmatch"
+version = "0.1.0"
+description = ""
+authors = ["Alex Newton <sharenfan222@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = ""
+repository = "https://github.com/Diaosi1111/nonebot_plugin_lolmatch"
+keywords = ["nonebot", "nonebot2", "LoL"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+aiohttp = "^3.7.4.post0"
+ujson = "^4.0.2"
+nonebot2 = "^2.0.0-alpha.15"
+nonebot-adapter-cqhttp = "^2.0.0-alpha.15"
+Pillow = "^8.2.0"
+playwright = "^1.17.0"
+aiosqlite = "^0.17.0"
+databases = "^0.5.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
