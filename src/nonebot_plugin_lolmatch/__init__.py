@@ -25,6 +25,7 @@ __plugin_meta__ = PluginMetadata(
         附带命令 本周 查看本周比赛信息
         附带命令 详情 [matchID] 查询指定比赛详细信息
         附带命令 订阅 [tournamentID] 订阅相关系列赛 每晚检查当日结果和第二天赛程
+        附带命令 取消订阅 [tournamentID] 订阅相关系列赛 每晚检查当日结果和第二天赛程
         附带命令 联赛 查看所有即将进行或正在进行的赛事以获取 [tournamentID]
 """,
     config=Config,
@@ -58,6 +59,10 @@ async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandA
             await lol_today.finish(await LoLMatch.show_match_details(matcher, index))
         except ValueError:
             await lol_today.finish("检查输入比赛ID应为数字")
+    elif "取消订阅" in msg:
+        sub_id = msg.replace("取消订阅", '').strip()
+        await lol_today.finish(
+            await LoLMatch.cancel_tournament_group(int(sub_id), event.group_id))
     elif "订阅" in msg:
         sub_id = msg.replace("订阅", "").strip()
         await lol_today.finish(

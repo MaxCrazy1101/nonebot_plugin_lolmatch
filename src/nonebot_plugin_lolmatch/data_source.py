@@ -135,7 +135,24 @@ class LoLMatch:
                 await sqlite_pool.execute(statement)
                 return True
             return False
-
+    @classmethod
+    async def tournament_cancel(cls, tournament_id: int, group_id: int):
+        if (tournament := await cls.tournament_fetch(tournament_id)) is None:
+            return False
+        else:
+            group_list = tournament["group_id"]
+            if group_list is None:
+                return False
+            if group_id in group_list:
+                group_list.remove(group_id)
+                statement = (
+                    sub_tournament.update()
+                    .where(sub_tournament.c.tournament == tournament_id)
+                    .values(group_id=group_list)
+                )
+                await sqlite_pool.execute(statement)
+                return True
+            return False
     @classmethod
     async def get_sub_tournament(cls, group_id: int = None) -> list:
         """
@@ -386,3 +403,17 @@ class LoLMatch:
                 return f"联赛ID {tournament_id} 订阅成功"
             else:
                 return f"联赛ID {tournament_id} 已经订阅"
+    @classmethod
+    async def cancel_tournament_group(cls, tournament_id: Optional[int], group_id: int):
+        if tournament_id is None:
+            all_available = [
+                lambda x: int(i["tournamentID"])
+                for i in await cls.get_available_tournament()
+            ]
+        else:
+            all_available = [tournament_id]
+        for tournament in all_available:
+            if await cls.tournament_cancel(tournament, group_id):
+                return f"联赛ID {tournament_id} 取消订阅"
+            else:
+                return f"联赛ID {tournament_id} 没有订阅"
