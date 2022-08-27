@@ -12,8 +12,9 @@ from nonebot.log import logger
 from sqlalchemy.schema import CreateTable
 from sqlite3 import OperationalError
 from nonebot_plugin_htmlrender import get_new_page as new_page
+from nonebot_plugin_htmlrender import md_to_pic
 from .model import sub_tournament, sqlite_pool, connect_database
-from .template import make_table
+from .template import make_table, day_analyze_builder
 
 api = "https://www.scoregg.com/services/api_url.php"
 afterMatchDetail = "https://img.scoregg.com/match/result/{}.json"
@@ -71,11 +72,11 @@ async def get_json(url):
                 return None
 
 
-async def create_image(html: str, wait: int = 0) -> bytes:
+async def create_image(html: str, locator: str, wait: int = 0) -> bytes:
     async with new_page() as page:
         await page.set_content(html, wait_until="networkidle")
         await page.wait_for_timeout(wait)
-        img_raw: bytes = await page.locator("#main-container > div").screenshot()
+        img_raw: bytes = await page.locator(locator).screenshot()
     return img_raw
 
 
@@ -135,6 +136,7 @@ class LoLMatch:
                 await sqlite_pool.execute(statement)
                 return True
             return False
+
     @classmethod
     async def tournament_cancel(cls, tournament_id: int, group_id: int):
         if (tournament := await cls.tournament_fetch(tournament_id)) is None:
@@ -153,6 +155,7 @@ class LoLMatch:
                 await sqlite_pool.execute(statement)
                 return True
             return False
+
     @classmethod
     async def get_sub_tournament(cls, group_id: int = None) -> list:
         """
@@ -179,8 +182,7 @@ class LoLMatch:
             return "已订阅赛事ID: " + " ".join(str(x['tournament']) for x in subbed)
         else:
             return "没有订阅"
-            
-            
+
     @classmethod
     async def get_available_tournament(cls) -> list:
         """
@@ -234,50 +236,41 @@ class LoLMatch:
             raise f"数据错误 code:{data_json['code']}"
 
     @classmethod
-    async def show_all_tournaments(cls):
+    async def show_all_tournaments(cls) -> MessageSegment:
         """
-        输出所有正在进行或者即将开始的锦标赛
-        :return:
+        输出所有正在进行或者即将开始的联赛
+
+        :return: 被MessageSegment包装结果图片
         """
         ava_tour = await cls.get_available_tournament()
-        _msg: str = "联赛ID  联赛名称      开始时间\n"
-        for tournament in ava_tour:
-            _msg += f"{tournament['tournamentID']}  {tournament['short_name']}  {tournament['start_date']}\n"
-        return _msg
+        if ava_tour:
+            _msg: str = "|联赛ID|联赛名称|开始时间|\n"
+            _msg += "|:-:|:-:|:-:|\n"
+            for tournament in ava_tour:
+                _msg += f"|{tournament['tournamentID']}|{tournament['short_name']}|{tournament['start_date']}|\n"
+            return MessageSegment.image(await md_to_pic(md=_msg))
+        else:
+            return MessageSegment.text("没有正在进行或者即将开始的联赛")
 
     @classmethod
-    async def show_today_matches(cls) -> str:
+    async def show_all_today_matches(cls) -> MessageSegment:
         """
         会返回今天所有比赛的结果，不管是否订阅.
+
         :return:
         """
         matches: dict = await cls.get_week_matches()
-        if matches is not None:
+        if matches:
             date = datetime.datetime.now().strftime("%Y.%m.%d")
             today_matches = matches[date]
             if isinstance(today_matches, list):
-                return "今日无比赛."
+                return MessageSegment.text("今日无比赛.")
             else:
                 today_matches: dict
-                return cls.analyze_daily(date, today_matches)
+                return MessageSegment.image(
+                    await create_image(day_analyze_builder(date, today_matches), locator="table"))
         else:
-            return "今日无比赛."
-
-    @classmethod
-    def analyze_daily(cls, date: str, inf: dict) -> str:
-        """
-        内部函数，格式化今日比赛信息
-        :param date: 日期
-        :param inf: 比赛信息
-        :return:
-        """
-        _msg = f"-----{date}-----\n"
-        for tournamentID, matchesINFO in inf["info"].items():
-            _msg += f"ID:{tournamentID} {matchesINFO['tournamentinfo']['short_name']}\n"
-            for match in matchesINFO["list"]:
-                # print(match) {match['match_id']}
-                _msg += f"{match['start_time']} {match['round_name']} {match['team_a_short_name']} VS {match['team_b_short_name']}\n"
-        return _msg
+            return MessageSegment.text("今日无比赛.")
 
     @classmethod
     def match_result_handle(cls, match_inf: dict) -> str:
@@ -304,23 +297,24 @@ class LoLMatch:
         return _msg
 
     @classmethod
-    async def show_week_matches(cls):
+    async def show_week_matches(cls) -> MessageSegment:
         """
         返回每周所有比赛信息
         :return:
         """
         matches: dict = await cls.get_week_matches()
         if matches is not None:
-            _msg = ""
+            _msg = MessageSegment.text("本周咨询:\n")
             for date, matches in matches.items():
                 if isinstance(matches, list):
                     _msg += f"---{date}无比赛---\n"
                 else:
                     matches: dict
-                    _msg += cls.analyze_daily(date, matches)
+                    _msg += MessageSegment.image(
+                        await create_image(day_analyze_builder(date, matches), locator="table"))
             return _msg
         else:
-            return "本周无比赛."
+            return MessageSegment.text("本周无比赛.")
 
     @classmethod
     async def get_match_details(cls, match_id: Union[int, str]) -> Optional[dict]:
@@ -350,7 +344,7 @@ class LoLMatch:
         html = f"""<html><head><meta charset="utf-8"><style type="text/css">
         {css}</style></head><body class="page-match"><div id="main-container" class="match-container end match-main piece after-classification">{make_table(after_match_detail["data"]["result_list"])}</div></body></html>"""
 
-        return await create_image(html)
+        return await create_image(html, locator="#main-container > div")
 
     @classmethod
     async def show_match_details(
@@ -403,6 +397,7 @@ class LoLMatch:
                 return f"联赛ID {tournament_id} 订阅成功"
             else:
                 return f"联赛ID {tournament_id} 已经订阅"
+
     @classmethod
     async def cancel_tournament_group(cls, tournament_id: Optional[int], group_id: int):
         if tournament_id is None:

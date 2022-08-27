@@ -1,7 +1,6 @@
 import datetime
 from nonebot.plugin import PluginMetadata, on_command
 from nonebot.log import logger
-from nonebot.permission import SUPERUSER
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message, Bot, NetworkError
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
@@ -71,7 +70,7 @@ async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandA
     elif "联赛" in msg:
         await lol_today.finish(await LoLMatch.show_all_tournaments())
     else:
-        await lol_today.finish(await LoLMatch.show_today_matches())
+        await lol_today.finish(await LoLMatch.show_all_today_matches())
 
 
 # 每日23点自动检查比赛
@@ -113,6 +112,15 @@ async def match_checker():
                         f"{__plugin_meta__.name} 向群 {group_id} 发送 {match_result} 失败"
                     )
 
+    # 检查已结束赛事 脱离数据库
+    available_tour: list = await LoLMatch.get_available_tournament()
+    ava_keys = []
+    for tour in available_tour:
+        ava_keys.append(int(tour["tournamentID"]))
+    for tournamentID in sub_dict.keys():
+        if tournamentID not in ava_keys:
+            await LoLMatch.del_tournament(tournamentID)
+
     # 处理明日赛程
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
     if tomorrow.strftime("%Y.%m.%d") not in match_data.keys():
@@ -141,12 +149,3 @@ async def match_checker():
                     logger.warning(
                         f"{__plugin_meta__.name} 向群 {group_id} 发送 {match_result} 失败"
                     )
-
-    available_tour: list = await LoLMatch.get_available_tournament()
-    # 检查已结束赛事 脱离数据库
-    ava_keys = []
-    for tour in available_tour:
-        ava_keys.append(int(tour["tournamentID"]))
-    for tournamentID in sub_dict.keys():
-        if tournamentID not in ava_keys:
-            await LoLMatch.del_tournament(tournamentID)
