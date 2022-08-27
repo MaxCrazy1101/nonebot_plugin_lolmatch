@@ -273,30 +273,6 @@ class LoLMatch:
             return MessageSegment.text("今日无比赛.")
 
     @classmethod
-    def match_result_handle(cls, match_inf: dict) -> str:
-        """
-        内部函数，构造今日比赛结果简报，提供比赛ID方便查询
-        :param match_inf:
-        :return:
-        """
-        _msg = ""
-        for match in match_inf:
-            _msg += f"ID:{match['match_id']} {match['start_time']} {match['team_a_short_name']} {match['team_a_win']} VS {match['team_b_win']} {match['team_b_short_name']}\n"
-        return _msg
-
-    @classmethod
-    def match_predict_handle(cls, match_inf: dict) -> str:
-        """
-        内部函数，构造明日比赛简报
-        :param match_inf:
-        :return:
-        """
-        _msg = ""
-        for match in match_inf:
-            _msg += f"ID:{match['match_id']} {match['start_time']} {match['team_a_short_name']} VS {match['team_b_short_name']} 近10场 {match['near_ten']['team_a_win_count']}:{match['near_ten']['team_b_win_count']}\n"
-        return _msg
-
-    @classmethod
     async def show_week_matches(cls) -> MessageSegment:
         """
         返回每周所有比赛信息

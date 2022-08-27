@@ -1,15 +1,20 @@
+import asyncio
 import datetime
+from copy import copy
+
 from nonebot.plugin import PluginMetadata, on_command
 from nonebot.log import logger
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message, Bot, NetworkError
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message, Bot, MessageSegment, \
+    NetworkError
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
 from nonebot.typing import Union
 from nonebot import require, get_bot, get_driver
 from pydantic import BaseModel
 
-from .data_source import LoLMatch
+from .data_source import LoLMatch, create_image
 from .model import disconnect_database
+from .template import match_brief_builder
 
 
 class Config(BaseModel):
@@ -86,31 +91,29 @@ async def match_checker():
         sub_dict[sub.tournament] = sub.group_id
     match_data = await LoLMatch.get_week_matches()
     sub_tournament = sub_dict.keys()
+
+    msg_container = {}
     # 获取今日赛果
-    _msg = ""
     today_matches: Union[list, dict] = match_data[
         datetime.datetime.now().strftime("%Y.%m.%d")
     ]
     if isinstance(today_matches, list):
         pass  # 今日无比赛
     else:
-        _msg += "---今日赛果---\n"
         today_matches: dict = today_matches["info"]
         for tournamentID, tournament_matches in today_matches.items():
             if int(tournamentID) not in sub_tournament:
                 continue  # 如果比赛不在订阅列表中不做处理
             match_result = (
-                    _msg
-                    + f"{tournament_matches['tournamentinfo']['short_name']}  ID:{tournamentID}\n"
-                    + LoLMatch.match_result_handle(tournament_matches["list"])
+                    f"""<tr><th colspan="2" align="center">联赛ID: {tournamentID}&nbsp;&nbsp;&nbsp;&nbsp;{tournament_matches['tournamentinfo']['short_name']}</th></tr>"""
+                    + "".join(
+                f"""<tr><td>{match['match_id']}</td><td>{match['team_a_short_name']} {match['team_a_win']} <font color=red>VS</font> {match['team_b_win']} {match['team_b_short_name']}</td></tr>"""
+                for match in tournament_matches["list"])
             )
             for group_id in sub_dict[int(tournamentID)]:
-                try:
-                    await bot.send_group_msg(group_id=group_id, message=match_result)
-                except NetworkError:
-                    logger.warning(
-                        f"{__plugin_meta__.name} 向群 {group_id} 发送 {match_result} 失败"
-                    )
+                tmp = msg_container.get(group_id, {"j": "", "m": ""})
+                tmp["j"] += match_result
+                msg_container[group_id] = tmp
 
     # 检查已结束赛事 脱离数据库
     available_tour: list = await LoLMatch.get_available_tournament()
@@ -132,20 +135,28 @@ async def match_checker():
     if isinstance(tomorrow_matches, list):
         pass  # 明日无比赛
     else:
-        _msg = "---明日赛程---\n"
         tomorrow_matches: dict = tomorrow_matches["info"]
         for tournamentID, tournament_matches in tomorrow_matches.items():
             if int(tournamentID) not in sub_tournament:
                 continue  # 如果比赛不在订阅列表中不做处理
             match_result = (
-                    _msg
-                    + f"{tournament_matches['tournamentinfo']['short_name']}  ID:{tournamentID}\n"
-                    + LoLMatch.match_predict_handle(tournament_matches["list"])
+                    f"""<tr><th colspan="2" align="center">联赛ID: {tournamentID}&nbsp;&nbsp;&nbsp;&nbsp;{tournament_matches['tournamentinfo']['short_name']}</th></tr>"""
+                    + "".join(
+                f"""<tr><td>{match['start_time']}</td><td>{match['team_a_short_name']} <font color=red>VS</font> {match['team_b_short_name']}</td></tr>"""
+                for match in tournament_matches["list"])
             )
             for group_id in sub_dict[int(tournamentID)]:
-                try:
-                    await bot.send_group_msg(group_id=group_id, message=match_result)
-                except NetworkError:
-                    logger.warning(
-                        f"{__plugin_meta__.name} 向群 {group_id} 发送 {match_result} 失败"
-                    )
+                tmp = msg_container.get(group_id, {"j": "", "m": ""})
+                tmp["m"] += match_result
+                msg_container[group_id] = tmp
+
+    for (group_id, msg) in msg_container.items():
+        match_result = await create_image(match_brief_builder(msg), locator="div")
+        try:
+            await bot.send_group_msg(group_id=group_id, message=MessageSegment.image(match_result))
+        except NetworkError:
+            logger.warning(
+                f"{__plugin_meta__.name} 向群 {group_id} 发送 {match_result} 失败"
+            )
+        # 停1秒
+        await  asyncio.sleep(1)
