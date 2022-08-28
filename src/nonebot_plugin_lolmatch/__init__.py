@@ -31,6 +31,7 @@ __plugin_meta__ = PluginMetadata(
         附带命令 订阅 [tournamentID] 订阅相关系列赛 每晚检查当日结果和第二天赛程
         附带命令 取消订阅 [tournamentID] 订阅相关系列赛 每晚检查当日结果和第二天赛程
         附带命令 联赛 查看所有即将进行或正在进行的赛事以获取 [tournamentID]
+        附带命令 联赛详情 [tournamentID] 查看所选联赛近期已完成的赛事获取 [matchID]
 """,
     config=Config,
     extra={"author": "Alex Newton"},
@@ -56,6 +57,9 @@ async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandA
             )
         except ValueError:
             await lol_today.finish("检查输入联赛ID应为数字")
+    elif "联赛详情" in msg:
+        t_id = msg.replace("联赛详情", "").strip()
+        await lol_today.finish(await LoLMatch.show_tournament_match(t_id))
     elif "详情" in msg:
         index_msg = msg.replace("详情", "").strip()
         try:
@@ -122,14 +126,14 @@ async def match_checker():
         ava_keys.append(int(tour["tournamentID"]))
     for tournamentID in sub_dict.keys():
         if tournamentID not in ava_keys:
+            sub_dict.pop(tournamentID)
             await LoLMatch.del_tournament(tournamentID)
 
     # 处理明日赛程
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
     if tomorrow.strftime("%Y.%m.%d") not in match_data.keys():
         tomorrow_matches = (await LoLMatch.get_week_matches(str(tomorrow.date())))[
-            tomorrow.strftime("%Y.%m.%d")
-        ]
+            tomorrow.strftime("%Y.%m.%d")]
     else:
         tomorrow_matches = match_data[tomorrow.strftime("%Y.%m.%d")]
     if isinstance(tomorrow_matches, list):

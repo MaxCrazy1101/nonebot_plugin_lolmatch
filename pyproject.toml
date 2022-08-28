@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nonebot_plugin_lolmatch"
-version = "0.2.2"
+version = "0.2.4"
 description = ""
 authors = ["Alex Newton <sharenfan222@gmail.com>"]
 license = "MIT"

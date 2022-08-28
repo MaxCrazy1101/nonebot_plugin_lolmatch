@@ -1,4 +1,4 @@
-day_html_header = """<html lang="zh-cn">
+html_header = """<html lang="zh-cn">
 <header>
     <meta charset="utf-8">
     <style type="text/css">
@@ -34,10 +34,14 @@ day_html_body = """<body>
 </table>
 </body>
 </html>"""
-
+tournament_brief_body = """<body><table>{body}</table></body></html>"""
 match_brief_body = """<body><div>{body}</div></body></html>"""
 match_brief_today = """<tr><th width="80px">结果ID</th><th width="240px" bgcolor=#FAEBD7>对战双方</th></tr>"""
 match_brief_tomorrow = """<tr><th width="80px">比赛时间</th><th width="240px" bgcolor=#FAEBD7>对战双方</th></tr>"""
+
+
+def tournament_brief_builder(table) -> str:
+    return html_header + tournament_brief_body.format(body=table)
 
 
 def day_analyze_builder(date: str, inf: dict) -> str:
@@ -53,7 +57,7 @@ def day_analyze_builder(date: str, inf: dict) -> str:
         _msg += f"""<tr><th colspan="3" align="center">联赛ID:{tournamentID}&nbsp;&nbsp;&nbsp;{matchesINFO['tournamentinfo']['short_name']}</th></tr>"""
         for match in matchesINFO["list"]:
             _msg += f"""<tr><td>{match['start_time']}</td><td>{match['round_name']}</td><td> {match['team_a_short_name']} <font color=red>VS</font> {match['team_b_short_name']}</td></tr>"""
-    return day_html_header + day_html_body.format(caption=f"---{date}---", body=_msg)
+    return html_header + day_html_body.format(caption=f"---{date}---", body=_msg)
 
 
 def match_brief_builder(msg: dict) -> str:
@@ -62,7 +66,7 @@ def match_brief_builder(msg: dict) -> str:
         html += f"""<table border="1"><caption><b>今日赛报</b></caption>{match_brief_today}{msg["j"]}</table>"""
     if msg["m"]:
         html += f"""<table border="1"><caption><b>明日赛程</b></caption>{match_brief_tomorrow}{msg["m"]}</table>"""
-    return day_html_header + match_brief_body.format(body=html)
+    return html_header + match_brief_body.format(body=html)
 
 
 class DayAnalyze:
