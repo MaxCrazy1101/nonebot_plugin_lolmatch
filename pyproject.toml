@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "nonebot_plugin_lolmatch"
-version = "0.2.4"
+version = "0.3.0.1"
 description = ""
 authors = ["Alex Newton <sharenfan222@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = ""
+homepage = "https://github.com/Diaosi1111/nonebot_plugin_lolmatch"
 repository = "https://github.com/Diaosi1111/nonebot_plugin_lolmatch"
 keywords = ["nonebot", "nonebot2", "LoL"]
 
@@ -13,14 +13,20 @@ keywords = ["nonebot", "nonebot2", "LoL"]
 python = ">=3.8,<3.11"
 aiohttp = "^3"
 ujson = "^5"
-nonebot2 = "^2.0.0b4"
+nonebot2 = "^2.0.0b5"
 nonebot-adapter-onebot = "^2"
+nonebot_plugin_apscheduler = "^0.2"
+nonebot_plugin_htmlrender = "^0.2"
+nonebot_plugin_tortoise_orm = "^0"
 pillow = "^9"
-playwright = "^1"
-aiosqlite = "^0.17.0"
-databases = "^0.5.0"
 
 [tool.poetry.dev-dependencies]
+black = "^22.1.0"
+nonebot2 = "^2.0.0b5"
+nonebot-adapter-onebot = "^2"
+nonebot_plugin_apscheduler = "^0.2.0"
+nonebot_plugin_htmlrender = "*"
+nonebot_plugin_tortoise_orm = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -1,17 +1,17 @@
 import datetime
 from os.path import dirname
-from sqlite3 import OperationalError
 from typing import Optional, Union
 
 import aiohttp
 import ujson as json
+from nonebot import require
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.log import logger
 from nonebot.matcher import Matcher
-from nonebot_plugin_htmlrender import get_new_page as new_page, md_to_pic
-from sqlalchemy.schema import CreateTable
 
-from .model import connect_database, sqlite_pool, sub_tournament
+require("nonebot_plugin_htmlrender")
+from nonebot_plugin_htmlrender import get_new_page as new_page, md_to_pic
+from .model import SubTournament
 from .template import day_analyze_builder, make_table, tournament_brief_builder
 
 api = "https://www.scoregg.com/services/api_url.php"
@@ -89,92 +89,82 @@ class LoLMatch:
     tournament_available_date = datetime.datetime(2021, 12, 1)
 
     @classmethod
-    async def creat_table(cls):
+    async def tournament_fetch(cls, tournament_id: int):
         """
-        初始化数据库
+        获得订阅改赛事的群
+        :param tournament_id: 赛事id
         :return:
         """
-        await connect_database()  # 初始化数据库
-        statement = CreateTable(sub_tournament)
-        try:
-            await sqlite_pool.execute(statement)
-        except OperationalError:
-            pass
-        except Exception as e:
-            print(e)
-            pass
-
-    @classmethod
-    async def tournament_fetch(cls, tournament_id: int):
-        statement = sub_tournament.select().where(
-            sub_tournament.c.tournament == tournament_id
-        )
-        return await sqlite_pool.fetch_one(statement)
+        return await SubTournament.filter(tournament=tournament_id).first()
 
     @classmethod
     async def del_tournament(cls, tournament_id):
-        statement = sub_tournament.delete().where(
-            sub_tournament.c.tournament == tournament_id
-        )
-        await sqlite_pool.execute(statement)
+        """
+        赛事结束，删除该的订阅条目
+        :param tournament_id: 锦标赛id
+        :return:
+        """
+        statement = SubTournament.filter(tournament=tournament_id)
+        await (await statement.first()).delete()
 
     @classmethod
-    async def tournament_upsert(cls, tournament_id: int, group_id: int):
+    async def tournament_upsert(cls, tournament_id: int, group_id: int) -> bool:
+        """
+        更新订阅的赛事信息
+        :param tournament_id: 锦标赛ID
+        :param group_id: 群号
+        :return: True 为添加成功 False为赛事已存在
+        """
         if (tournament := await cls.tournament_fetch(tournament_id)) is None:
-            statement = sub_tournament.insert().values(
-                tournament=tournament_id, group_id=[group_id]
-            )
-            await sqlite_pool.execute(statement)
-            return True
+            await SubTournament.create(tournament=tournament_id, group_id=[group_id])
         else:
-            group_list = tournament["group_id"]
+            group_list = tournament.group_id
             if group_list is None:
                 group_list = []
             if group_id not in group_list:
                 group_list.append(group_id)
-                statement = (
-                    sub_tournament.update()
-                    .where(sub_tournament.c.tournament == tournament_id)
-                    .values(group_id=group_list)
-                )
-                await sqlite_pool.execute(statement)
-                return True
-            return False
+                tournament.group_id = group_list
+                await tournament.save()
+            else:
+                return False
+        return True
 
     @classmethod
-    async def tournament_cancel(cls, tournament_id: int, group_id: int):
+    async def tournament_cancel(cls, tournament_id: int, group_id: int) -> bool:
+        """
+        取消订阅的赛事信息
+        :param tournament_id: 锦标赛ID
+        :param group_id: 群号
+        :return: True 为取消成功 False为赛事不存在
+        """
         if (tournament := await cls.tournament_fetch(tournament_id)) is None:
             return False
         else:
-            group_list = tournament["group_id"]
+            group_list = tournament.group_id
             if group_list is None:
                 return False
             if group_id in group_list:
                 group_list.remove(group_id)
-                statement = (
-                    sub_tournament.update()
-                    .where(sub_tournament.c.tournament == tournament_id)
-                    .values(group_id=group_list)
-                )
-                await sqlite_pool.execute(statement)
-                return True
-            return False
+                tournament.group_id = group_list
+                await tournament.save()
+            else:
+                return False
+        return True
 
     @classmethod
-    async def get_sub_tournament(cls, group_id: int = None) -> list:
+    async def get_sub_tournament(cls, group_id: int = None) -> list[SubTournament]:
         """
         获取所给群号已经订阅的所有锦标赛ID
         不提供群号时返回所有
         :param group_id:
         :return:
         """
-        statement = sub_tournament.select()
-        result = await sqlite_pool.fetch_all(statement)
+        result = await SubTournament.all()
         if group_id is None:
             return result
         ans = []
         for tournament in result:
-            if group_id in tournament["group_id"]:
+            if group_id in tournament.group_id:
                 ans.append(tournament)
         return ans
 
@@ -183,7 +173,7 @@ class LoLMatch:
         subbed = await cls.get_sub_tournament(group_id)
         print(subbed)
         if subbed:
-            return "已订阅赛事ID: " + " ".join(str(x['tournament']) for x in subbed)
+            return "已订阅赛事ID: " + " ".join(str(x.tournament) for x in subbed)
         else:
             return "没有订阅"
 
@@ -194,8 +184,8 @@ class LoLMatch:
         :return:
         """
         if (
-                LoLMatch.tournament_available_date + datetime.timedelta(hours=1)
-                > datetime.datetime.now()
+            LoLMatch.tournament_available_date + datetime.timedelta(hours=1)
+            > datetime.datetime.now()
         ):
             return cls.tournament_available
         async with aiohttp.ClientSession() as session:
@@ -207,9 +197,7 @@ class LoLMatch:
                     return []
         if data_json["code"] == "200":
             cls.tournament_available = [
-                tournament
-                for tournament in data_json["data"]["list"]
-                if tournament["status"] != 2
+                tournament for tournament in data_json["data"]["list"] if tournament["status"] != 2
             ]
             cls.tournament_available_date = datetime.datetime.now()
             return cls.tournament_available
@@ -231,7 +219,7 @@ class LoLMatch:
             else:
                 match_params["date"] = date
             if tournament_id is None:
-                match_params.pop("tournament_id")
+                match_params.pop("tournament_id", 0)
             else:
                 match_params["tournament_id"] = tournament_id
             async with session.post(url=api, data=match_params) as resp:
@@ -278,7 +266,8 @@ class LoLMatch:
             else:
                 today_matches: dict
                 return MessageSegment.image(
-                    await create_image(day_analyze_builder(date, today_matches), locator="table"))
+                    await create_image(day_analyze_builder(date, today_matches), locator="table")
+                )
         else:
             return MessageSegment.text("今日无比赛.")
 
@@ -297,7 +286,8 @@ class LoLMatch:
                 else:
                     matches: dict
                     _msg += MessageSegment.image(
-                        await create_image(day_analyze_builder(date, matches), locator="table"))
+                        await create_image(day_analyze_builder(date, matches), locator="table")
+                    )
             return _msg
         else:
             return MessageSegment.text("本周无比赛.")
@@ -364,7 +354,7 @@ class LoLMatch:
 
     @classmethod
     async def show_match_details(
-            cls, matcher: Matcher, match_id: Union[int, str]
+        cls, matcher: Matcher, match_id: Union[int, str]
     ) -> Union[str, MessageSegment]:
         """
         返回所提供比赛ID的具体信息，包括每小场的截图
@@ -403,8 +393,7 @@ class LoLMatch:
     async def sub_tournament_group(cls, tournament_id: Optional[int], group_id: int):
         if tournament_id is None:
             all_available = [
-                lambda x: int(i["tournamentID"])
-                for i in await cls.get_available_tournament()
+                lambda x: int(i["tournamentID"]) for i in await cls.get_available_tournament()
             ]
         else:
             all_available = [tournament_id]
@@ -418,8 +407,7 @@ class LoLMatch:
     async def cancel_tournament_group(cls, tournament_id: Optional[int], group_id: int):
         if tournament_id is None:
             all_available = [
-                lambda x: int(i["tournamentID"])
-                for i in await cls.get_available_tournament()
+                lambda x: int(i["tournamentID"]) for i in await cls.get_available_tournament()
             ]
         else:
             all_available = [tournament_id]

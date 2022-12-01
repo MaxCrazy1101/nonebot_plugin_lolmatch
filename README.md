@@ -25,12 +25,15 @@ lolmatch是一个有关于lol比赛信息的插件，你可以用它来获取每
 
 ## 注意
 
-因为本插件使用了playwright模块，在windows平台需要在prod下运行不能热重载
+因为本插件使用了playwright模块，在windows平台下可能需要将.env.dev中的FASTAPI_RELOAD设置为false
 
-使用本插件需要提供定时模块可以使用以下命令安装
+使用本插件依赖3个外部插件，可以使用以下命令安装
 
 ```
     nb plugin install nonebot_plugin_apscheduler
+    nb plugin install nonebot-plugin-tortoise-orm
+    nb plugin install nonebot-plugin-htmlrender 
+
 ```
 
 使用本插件需要提供htmlrender插件可以使用以下命令安装

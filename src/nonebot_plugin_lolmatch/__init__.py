@@ -1,19 +1,17 @@
 import asyncio
 import datetime
-from copy import copy
 
-from nonebot.plugin import PluginMetadata, on_command
-from nonebot.log import logger
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message, Bot, MessageSegment, \
+from nonebot import get_bot, get_driver, require
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment, \
     NetworkError
+from nonebot.log import logger
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
+from nonebot.plugin import PluginMetadata, on_command
 from nonebot.typing import Union
-from nonebot import require, get_bot, get_driver
 from pydantic import BaseModel
 
 from .data_source import LoLMatch, create_image
-from .model import disconnect_database
 from .template import match_brief_builder
 
 
@@ -37,12 +35,11 @@ __plugin_meta__ = PluginMetadata(
     extra={"author": "Alex Newton"},
 )
 
-scheduler = require("nonebot_plugin_apscheduler").scheduler
+require("nonebot_plugin_apscheduler")
+from nonebot_plugin_apscheduler import scheduler
 
 lol_today = on_command("lol", aliases={"LOL", "Lol"}, priority=5)
 driver = get_driver()
-driver.on_startup(LoLMatch.creat_table)
-driver.on_shutdown(disconnect_database)
 
 
 @lol_today.handle()
@@ -126,7 +123,6 @@ async def match_checker():
         ava_keys.append(int(tour["tournamentID"]))
     for tournamentID in sub_dict.keys():
         if tournamentID not in ava_keys:
-            sub_dict.pop(tournamentID)
             await LoLMatch.del_tournament(tournamentID)
 
     # 处理明日赛程
