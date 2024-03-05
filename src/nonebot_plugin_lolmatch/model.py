@@ -1,6 +1,6 @@
+from nonebot import require
 from tortoise import fields
 from tortoise.models import Model
-from nonebot import require
 
 require("nonebot_plugin_tortoise_orm")
 from nonebot_plugin_tortoise_orm import add_model

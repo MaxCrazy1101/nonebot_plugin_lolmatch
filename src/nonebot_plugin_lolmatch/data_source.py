@@ -10,7 +10,9 @@ from nonebot.log import logger
 from nonebot.matcher import Matcher
 
 require("nonebot_plugin_htmlrender")
-from nonebot_plugin_htmlrender import get_new_page as new_page, md_to_pic
+from nonebot_plugin_htmlrender import get_new_page as new_page
+from nonebot_plugin_htmlrender import md_to_pic
+
 from .model import SubTournament
 from .template import day_analyze_builder, make_table, tournament_brief_builder
 
@@ -30,7 +32,7 @@ tournament_params = {
     "gameID": "1",
     "type": "all",
     "page": "1",
-    "limit": "18"
+    "limit": "18",
     # 'year':
 }
 match_params = {
@@ -197,7 +199,9 @@ class LoLMatch:
                     return []
         if data_json["code"] == "200":
             cls.tournament_available = [
-                tournament for tournament in data_json["data"]["list"] if tournament["status"] != 2
+                tournament
+                for tournament in data_json["data"]["list"]
+                if tournament["status"] != 2
             ]
             cls.tournament_available_date = datetime.datetime.now()
             return cls.tournament_available
@@ -205,7 +209,9 @@ class LoLMatch:
             return []
 
     @classmethod
-    async def get_week_matches(cls, date: str = None, tournament_id: int = None) -> Optional[dict]:
+    async def get_week_matches(
+        cls, date: str = None, tournament_id: int = None
+    ) -> Optional[dict]:
         """
         获取属于所给日期的一周的比赛信息
 
@@ -266,7 +272,9 @@ class LoLMatch:
             else:
                 today_matches: dict
                 return MessageSegment.image(
-                    await create_image(day_analyze_builder(date, today_matches), locator="table")
+                    await create_image(
+                        day_analyze_builder(date, today_matches), locator="table"
+                    )
                 )
         else:
             return MessageSegment.text("今日无比赛.")
@@ -286,7 +294,9 @@ class LoLMatch:
                 else:
                     matches: dict
                     _msg += MessageSegment.image(
-                        await create_image(day_analyze_builder(date, matches), locator="table")
+                        await create_image(
+                            day_analyze_builder(date, matches), locator="table"
+                        )
                     )
             return _msg
         else:
@@ -319,8 +329,12 @@ class LoLMatch:
                 break
             flag = True
             prev = datetime.datetime.now() - datetime.timedelta(days=7)
-            result = await cls.get_week_matches(tournament_id=tournament_id, date=str(prev.date()))
-        return MessageSegment.image(await create_image(tournament_brief_builder(table), "table"))
+            result = await cls.get_week_matches(
+                tournament_id=tournament_id, date=str(prev.date())
+            )
+        return MessageSegment.image(
+            await create_image(tournament_brief_builder(table), "table")
+        )
 
     @classmethod
     async def get_match_details(cls, match_id: Union[int, str]) -> Optional[dict]:
@@ -345,7 +359,7 @@ class LoLMatch:
     async def after_match_detail_screenshot(cls, result_id: int):
         after_match_detail = await get_json(afterMatchDetail.format(result_id))
 
-        with open(dirname(__file__) + "/short.css", "r") as f:
+        with open(dirname(__file__) + "/short.css", "r", encoding="utf-8") as f:
             css = f.read()
         html = f"""<html><head><meta charset="utf-8"><style type="text/css">
         {css}</style></head><body class="page-match"><div id="main-container" class="match-container end match-main piece after-classification">{make_table(after_match_detail["data"]["result_list"])}</div></body></html>"""
@@ -393,7 +407,8 @@ class LoLMatch:
     async def sub_tournament_group(cls, tournament_id: Optional[int], group_id: int):
         if tournament_id is None:
             all_available = [
-                lambda x: int(i["tournamentID"]) for i in await cls.get_available_tournament()
+                lambda x: int(i["tournamentID"])
+                for i in await cls.get_available_tournament()
             ]
         else:
             all_available = [tournament_id]
@@ -407,7 +422,8 @@ class LoLMatch:
     async def cancel_tournament_group(cls, tournament_id: Optional[int], group_id: int):
         if tournament_id is None:
             all_available = [
-                lambda x: int(i["tournamentID"]) for i in await cls.get_available_tournament()
+                lambda x: int(i["tournamentID"])
+                for i in await cls.get_available_tournament()
             ]
         else:
             all_available = [tournament_id]
