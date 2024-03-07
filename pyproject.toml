@@ -1,32 +1,34 @@
 [tool.poetry]
 name = "nonebot_plugin_lolmatch"
-version = "0.3.0.2"
+version = "0.4.0b4"
 description = ""
 authors = ["Alex Newton <sharenfan222@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/Diaosi1111/nonebot_plugin_lolmatch"
-repository = "https://github.com/Diaosi1111/nonebot_plugin_lolmatch"
+homepage = "https://github.com/MaxCrazy1101/nonebot_plugin_lolmatch"
+repository = "https://github.com/MaxCrazy1101/nonebot_plugin_lolmatch"
 keywords = ["nonebot", "nonebot2", "LoL"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
 aiohttp = "^3"
 ujson = "^5"
-nonebot2 = "^2.0.0b5"
-nonebot-adapter-onebot = "^2"
-nonebot_plugin_apscheduler = "^0.2"
-nonebot_plugin_htmlrender = "^0.2"
-nonebot_plugin_tortoise_orm = "^0.0.1a3"
-pillow = "^9"
+nonebot2 = "^2.2.0"
+nonebot_plugin_apscheduler = ">=0.4.0,<2.0.0"
+nonebot_plugin_htmlrender = ">=0.3.0,<1.0.0"
+pillow = ">=8"
+nonebot-plugin-orm = ">=0.7.0,<1.0.0"
 
 [tool.poetry.dev-dependencies]
-black = "^22.1.0"
-nonebot2 = "^2.0.0b5"
-nonebot-adapter-onebot = "^2"
-nonebot_plugin_apscheduler = "^0.2.0"
-nonebot_plugin_htmlrender = "*"
-nonebot_plugin_tortoise_orm = "*"
+nonebot-adapter-onebot = "^2.2.4"
+nonebot-plugin-orm = { extras = ["default"], version = ">=0.7.0" }
+
+[tool.nonebot]
+plugins = ["nonebot_plugin_lolmatch"]
+adapters = [
+    { name = "OneBot V12", module_name = "nonebot.adapters.onebot.v12", project_link = "nonebot-adapter-onebot", desc = "OneBot V12 协议" },
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11", project_link = "nonebot-adapter-onebot", desc = "OneBot V11 协议" },
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

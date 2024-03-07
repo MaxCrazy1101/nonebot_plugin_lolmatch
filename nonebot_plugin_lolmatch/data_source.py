@@ -4,14 +4,13 @@ from typing import Optional, Union
 
 import aiohttp
 import ujson as json
-from nonebot import require
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.log import logger
 from nonebot.matcher import Matcher
-
-require("nonebot_plugin_htmlrender")
 from nonebot_plugin_htmlrender import get_new_page as new_page
 from nonebot_plugin_htmlrender import md_to_pic
+from nonebot_plugin_orm import get_session
+from sqlalchemy import select
 
 from .model import SubTournament
 from .template import day_analyze_builder, make_table, tournament_brief_builder
@@ -91,23 +90,34 @@ class LoLMatch:
     tournament_available_date = datetime.datetime(2021, 12, 1)
 
     @classmethod
-    async def tournament_fetch(cls, tournament_id: int):
+    async def tournament_fetch(cls, tournament_id: int) -> Optional[SubTournament]:
         """
         获得订阅改赛事的群
         :param tournament_id: 赛事id
         :return:
         """
-        return await SubTournament.filter(tournament=tournament_id).first()
+        group = None
+        async with get_session() as session:
+            group = await session.scalar(
+                select(SubTournament).where(SubTournament.tournament == tournament_id)
+            )
+        return group
+        # return await SubTournament.filter(tournament=tournament_id).first()
 
     @classmethod
-    async def del_tournament(cls, tournament_id):
+    async def tournament_delete(cls, tournament_id: int) -> None:
         """
         赛事结束，删除该的订阅条目
         :param tournament_id: 锦标赛id
         :return:
         """
-        statement = SubTournament.filter(tournament=tournament_id)
-        await (await statement.first()).delete()
+        async with get_session() as session:
+            results = await session.scalars(
+                select(SubTournament).where(SubTournament.tournament == tournament_id)
+            )
+            if tournament := results.one_or_none():
+                await session.delete(tournament)
+                await session.commit()
 
     @classmethod
     async def tournament_upsert(cls, tournament_id: int, group_id: int) -> bool:
@@ -115,20 +125,25 @@ class LoLMatch:
         更新订阅的赛事信息
         :param tournament_id: 锦标赛ID
         :param group_id: 群号
-        :return: True 为添加成功 False为赛事已存在
+        :return: True 为添加成功 False为赛事添加失败
         """
-        if (tournament := await cls.tournament_fetch(tournament_id)) is None:
-            await SubTournament.create(tournament=tournament_id, group_id=[group_id])
-        else:
-            group_list = tournament.group_id
-            if group_list is None:
-                group_list = []
-            if group_id not in group_list:
-                group_list.append(group_id)
-                tournament.group_id = group_list
-                await tournament.save()
+
+        async with get_session() as session:
+            statement = select(SubTournament).where(
+                SubTournament.tournament == tournament_id
+            )
+            results = await session.scalars(statement)
+            if sub_tournament := results.one_or_none():
+                group_id_list = sub_tournament.group_id
+                if group_id in group_id_list:
+                    return False
+                sub_tournament.group_id = group_id_list.append(group_id)
             else:
-                return False
+                sub_tournament = SubTournament(
+                    tournament=tournament_id, group_id=[group_id]
+                )
+                session.add(sub_tournament)
+            await session.commit()
         return True
 
     @classmethod
@@ -161,14 +176,15 @@ class LoLMatch:
         :param group_id:
         :return:
         """
-        result = await SubTournament.all()
-        if group_id is None:
-            return result
-        ans = []
-        for tournament in result:
-            if group_id in tournament.group_id:
-                ans.append(tournament)
-        return ans
+        async with get_session() as session:
+            result = await session.scalars(select(SubTournament))
+            if group_id is None:
+                return result.fetchall()
+            ans = []
+            for tournament in result.all():
+                if group_id in tournament.group_id:
+                    ans.append(tournament)
+            return ans
 
     @classmethod
     async def show_subbed_tournament(cls, group_id: int) -> str:

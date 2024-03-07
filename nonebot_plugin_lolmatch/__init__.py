@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from typing import Union
 
-from nonebot import get_bot, get_driver, require
+from nonebot import get_bot, get_plugin_config, require
 from nonebot.adapters.onebot.v11 import (
     Bot,
     GroupMessageEvent,
@@ -15,9 +15,18 @@ from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata, on_command
 
-from .config import Config
-from .data_source import LoLMatch, create_image
-from .template import match_brief_builder
+require("nonebot_plugin_apscheduler")
+require("nonebot_plugin_htmlrender")
+require("nonebot_plugin_orm")
+
+from nonebot_plugin_apscheduler import scheduler  # noqa: E402
+
+from .config import Config  # noqa: E402
+from .data_source import LoLMatch, create_image  # noqa: E402
+from .template import match_brief_builder  # noqa: E402
+
+plugin_config = get_plugin_config(Config)
+
 
 __plugin_meta__ = PluginMetadata(
     name="LOLMatch",
@@ -35,11 +44,13 @@ __plugin_meta__ = PluginMetadata(
     extra={"author": "Alex Newton"},
 )
 
-require("nonebot_plugin_apscheduler")
-from nonebot_plugin_apscheduler import scheduler
 
-lol_today = on_command("lol", aliases={"LOL", "Lol"}, priority=5)
-driver = get_driver()
+lol_today = on_command(
+    "lol",
+    aliases={"LOL", "Lol"},
+    priority=plugin_config.lolmatch_command_priority,
+    block=True,
+)
 
 
 @lol_today.handle()
@@ -80,13 +91,29 @@ async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandA
         await lol_today.finish(await LoLMatch.show_all_today_matches())
 
 
+lol_today_test = on_command(
+    "lotest",
+    aliases={"LOL", "Lol"},
+    priority=plugin_config.lolmatch_command_priority,
+    block=True,
+)
+
+
+@lol_today_test.handle()
+async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandArg()):
+    await match_checker()
+    await lol_today_test.finish()
+
+
 # 每日23点自动检查比赛
 @scheduler.scheduled_job("cron", hour=23, jitter=180, id="lol_check_match")
 async def match_checker():
     try:
         bot: Bot = get_bot()  # 当未连接bot时返回
     except ValueError:
+        logger.info("未连接bot")
         return
+
     subbed = await LoLMatch.get_sub_tournament()  # 获得所有订阅的tournament
     sub_dict: dict = {}
     for sub in subbed:
@@ -125,7 +152,7 @@ async def match_checker():
         ava_keys.append(int(tour["tournamentID"]))
     for tournamentID in sub_dict.keys():
         if tournamentID not in ava_keys:
-            await LoLMatch.del_tournament(tournamentID)
+            await LoLMatch.tournament_delete(tournamentID)
 
     # 处理明日赛程
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
