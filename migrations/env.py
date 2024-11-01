@@ -39,12 +39,12 @@ def run_migrations_offline() -> None:
 
     context.configure(
         **{
-            **dict(
-                url=engine.url,
-                dialect_opts={"paramstyle": "named"},
-                target_metadata=target_metadata,
-                literal_binds=True,
-            ),
+            **{
+                "url": engine.url,
+                "dialect_opts": {"paramstyle": "named"},
+                "target_metadata": target_metadata,
+                "literal_binds": True,
+            },
             **plugin_config.alembic_context,
         }
     )
@@ -56,12 +56,12 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
         **{
-            **dict(
-                connection=connection,
-                render_as_batch=True,
-                target_metadata=target_metadata,
-                include_object=no_drop_table,
-            ),
+            **{
+                "connection": connection,
+                "render_as_batch": True,
+                "target_metadata": target_metadata,
+                "include_object": no_drop_table,
+            },
             **plugin_config.alembic_context,
         }
     )

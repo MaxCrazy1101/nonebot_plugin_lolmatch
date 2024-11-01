@@ -91,18 +91,18 @@ async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandA
         await lol_today.finish(await LoLMatch.show_all_today_matches())
 
 
-lol_today_test = on_command(
-    "lotest",
-    aliases={"LOL", "Lol"},
-    priority=plugin_config.lolmatch_command_priority,
-    block=True,
-)
+# lol_today_test = on_command(
+#     "lotest",
+#     aliases={"LOL", "Lol"},
+#     priority=plugin_config.lolmatch_command_priority,
+#     block=True,
+# )
 
 
-@lol_today_test.handle()
-async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandArg()):
-    await match_checker()
-    await lol_today_test.finish()
+# @lol_today_test.handle()
+# async def _(matcher: Matcher, event: GroupMessageEvent, args: Message = CommandArg()):
+#     await match_checker()
+#     await lol_today_test.finish()
 
 
 # 每日23点自动检查比赛
